@@ -148,3 +148,42 @@ Platform-specific instructions are available for
 [Windows](packaging/windows/README.md),
 [macOS](packaging/macos/README.md), and
 [Linux](packaging/linux/README.md).
+
+### Nix
+
+`flake.nix` pins the toolchain and libraries, and a `Justfile` drives game data
+extraction, the build, and launching. This replaces the Docker build for local
+development on any x86-64 Linux distribution, NixOS or not; it does not produce
+a release package.
+
+On a fresh machine the only prerequisite is Nix with the `nix-command` and
+`flakes` experimental features enabled:
+
+```sh
+git clone https://github.com/elyosh/OpenTIE.git
+cd OpenTIE
+mkdir -p dl
+cp /path/to/*.exe dl/          # the GOG installers
+nix develop --command just play
+```
+
+`just play` checks out the submodules, extracts the installers from `dl/` with
+`innoextract`, configures and builds with CMake, then launches OpenTIE against
+the extracted data. The leading `nix develop --command` is only needed when
+`just` is not already on the host PATH, since the dev shell provides it; every
+recipe re-enters the shell itself, so plain `just play` works otherwise.
+`nix develop` on its own, or `just shell`, opens the environment interactively.
+
+Useful recipes — `just --list` shows them all:
+
+| Recipe | Action |
+|---|---|
+| `just extract` | Extract the GOG installers in `dl/` into `game/` |
+| `just build` | Configure and build the engine |
+| `just run *args` | Launch, forwarding extra arguments |
+| `just status` | Report which editions and build are present |
+| `just reset-prefs` | Delete pilots and settings so first-run setup repeats |
+
+[PLAYING.md](PLAYING.md) covers the layout of `game/`, which installer filename
+maps to which edition, and the two deliberate deviations from the Docker
+build.

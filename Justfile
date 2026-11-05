@@ -4,7 +4,8 @@
 #   just --list    # all recipes
 #
 # Every recipe works from a bare shell: it re-enters the Nix dev shell itself
-# when needed, so `just play` is enough on a machine with only Nix installed.
+# when needed. On a machine with only Nix installed, bootstrap with
+# `nix develop --command just play` — the dev shell is what provides `just`.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -87,12 +88,15 @@ status:
     echo "build:  $([ -x '{{build_dir}}/OpenTIE' ] && echo '{{build_dir}}/OpenTIE' || echo 'not built')"
     echo "prefs:  $([ -d '{{prefs}}' ] && echo '{{prefs}}' || echo 'none yet')"
 
-# Configure the CMake build tree.
-#
-# -include new works around aeron/src/fsr3/backend.cpp using std::nothrow
+# -include new below works around aeron/src/fsr3/backend.cpp using std::nothrow
 # without including <new>; GCC 14+ no longer pulls it in transitively. Applied
 # here rather than by editing the vendored aeron submodule, so it survives
 # `git submodule update`. Harmless once upstream adds the include.
+#
+# The blank line matters: `just --list` shows only the comment block directly
+# above a recipe, and only its last line.
+
+# Configure the CMake build tree.
 configure:
     {{nix}} cmake -S . -B {{build_dir}} -G Ninja \
         -DCMAKE_BUILD_TYPE={{build_type}} \

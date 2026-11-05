@@ -1,21 +1,38 @@
-# Playing OpenTIE on NixOS
+# Playing OpenTIE with Nix
 
 `flake.nix` pins the toolchain and libraries; the `Justfile` drives extraction,
 the build, and launching. Everything runs from the repository root.
 
+This works on any x86-64 Linux distribution with Nix installed, not just
+NixOS — the flake brings its own compiler, CMake, SDL3, and the rest, so the
+host only provides the kernel, the GPU driver, and Nix itself. NixOS is where
+it is tested; see [Non-NixOS hosts](#non-nixos-hosts) for the one thing that
+differs. The dev shell is Linux-only: its runtime dependencies (`wayland`,
+`libGL`, the X libraries) do not evaluate on macOS, which has its own build in
+[packaging/macos](packaging/macos/README.md).
+
+Requirements:
+
+- Nix with the `nix-command` and `flakes` experimental features enabled
+- the GOG installers for the original game (see [Game data](#game-data))
+
 ```sh
-just play        # extract game data, build, launch
-just --list      # all recipes
+nix develop --command just play   # extract game data, build, launch
+just --list                       # all recipes
 ```
 
-Recipes re-enter the Nix dev shell on their own, so `just play` works from a
-bare shell with nothing but Nix installed. `just shell` opens the same
-environment interactively if you want `cmake`/`ninja` on PATH directly.
+Recipes re-enter the Nix dev shell on their own, so after the first call plain
+`just play` works from a bare shell. The `nix develop --command` prefix is only
+needed while `just` itself is missing from the host PATH, since it is one of
+the tools the dev shell provides. `just shell` (or `nix develop`) opens the
+same environment interactively if you want `cmake`/`ninja` on PATH directly.
 
 ## Game data
 
-Put the GOG installers in `dl/` and run `just extract`. Each edition is
-extracted with `innoextract` into its own directory and matched by filename:
+Put the GOG installers in `dl/` (`mkdir -p dl` first — the directory is
+gitignored, so a fresh clone does not have it) and run `just extract`. Each
+edition is extracted with `innoextract` into its own directory and matched by
+filename:
 
 | Directory    | Installer matched on | Edition                    |
 | ------------ | -------------------- | -------------------------- |
@@ -71,6 +88,28 @@ range — rather than following whatever GCC nixpkgs ships. Library versions com
 from nixpkgs and differ slightly from the release pins (SDL3 3.4.18 vs 3.4.14);
 the `>= 3.4` requirement in `aeron/CMakeLists.txt` is satisfied.
 
-Vulkan comes from the host driver via `/run/opengl-driver`, which the nixpkgs
-`vulkan-loader` already searches. `just status` and `vulkaninfo --summary`
+Vulkan comes from the host driver, not from nixpkgs. The nixpkgs
+`vulkan-loader` searches `/run/opengl-driver/share/vulkan/icd.d`, where NixOS
+puts the driver's ICD manifests. `just status` and `vulkaninfo --summary`
 (available in the dev shell) are the quick checks if rendering fails to start.
+
+## Non-NixOS hosts
+
+Only the graphics driver needs attention. The same `vulkan-loader` also
+searches `/usr/local/share` and `/usr/share` along with the `XDG_DATA_DIRS`
+paths, so the ICD manifests a normal distribution installs under
+`/usr/share/vulkan/icd.d` are found without any extra configuration, and the
+driver itself is loaded from the host.
+
+If `vulkaninfo --summary` inside `just shell` reports no devices, point the
+loader at the manifest explicitly:
+
+```sh
+export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+```
+
+Where the host driver and the Nix-built loader disagree too much to pair up —
+most often with the proprietary NVIDIA driver, whose userspace library has to
+match the running kernel module — [nixGL](https://github.com/nix-community/nixGL)
+supplies a matching driver into the Nix environment, and `just run` can be
+wrapped with it.
