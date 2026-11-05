@@ -58,3 +58,7 @@ cmake-build-*/
 .idea/
 .cache/
 tools/matching/
+
+# Original game data: GOG installers and the editions the Justfile extracts
+dl/
+game/
